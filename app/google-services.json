@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "8338173657",
+    "project_id": "fragrance-management-system",
+    "storage_bucket": "fragrance-management-system.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:8338173657:android:8ce716fc66dc362c4498c8",
+        "android_client_info": {
+          "package_name": "com.fms.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAt8TYWJWm5AtQ0Frb1gbXf6YOEiRsrqMc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
