@@ -1,54 +1,54 @@
 package com.fms.app.admin
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
-fun AdminPanelScreen(
-    onOpenModule: (String) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
+fun AdminPanelScreen(viewModel: AdminPanelViewModel = viewModel()) {
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Text("Super Admin: Tenant Lifecycle Management", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(16.dp))
 
-        Button(
-            onClick = { onOpenModule("UOMs") },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Manage UOMs")
-        }
+        if (viewModel.isLoading) {
+            CircularProgressIndicator()
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(viewModel.tenants) { tenant ->
+                    val companyId = tenant["companyId"]?.toString() ?: ""
+                    val isActive = tenant["isActive"] as? Boolean ?: true
 
-        Spacer(modifier = Modifier.height(12.dp))
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text(tenant["name"]?.toString() ?: "Unknown", style = MaterialTheme.typography.titleMedium)
+                                Text("ID: $companyId", style = MaterialTheme.typography.bodySmall)
+                            }
 
-        Button(
-            onClick = { onOpenModule("ProductTypes") },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Manage Product Types")
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Button(
-            onClick = { onOpenModule("ProductAttributes") },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Manage Product Attributes")
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Button(
-            onClick = { onOpenModule("Admins") },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Manage Admins")
+                            Button(
+                                onClick = { viewModel.toggleTenantStatus(companyId, isActive) },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isActive) Color(0xFFC62828) else Color(0xFF2E7D32)
+                                )
+                            ) {
+                                Text(if (isActive) "Suspend" else "Activate")
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
