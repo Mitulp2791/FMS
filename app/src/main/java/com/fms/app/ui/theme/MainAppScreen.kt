@@ -5,44 +5,51 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.fms.app.data.UserSession
 
-data class NavigationItem(
-    val title: String,
+/**
+ * AppModuleItem: Enhanced with Icon and RBAC Module Key.
+ */
+data class AppModuleItem(
+    val name: String,
     val icon: ImageVector,
-    val moduleKey: String
+    val moduleKey: String,
+    val requiredRole: String? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainAppScreen() {
-    var currentScreen by remember { mutableStateOf("Dashboard") }
-
-    val allNavigationItems = listOf(
-        NavigationItem("Dashboard", Icons.Default.Home, "Dashboard"),
-        NavigationItem("Billing (Sales)", Icons.Default.ShoppingCart, "Billing"),
-        NavigationItem("Purchase Inward", Icons.Default.AddCircle, "Transactions"),
-        NavigationItem("Inventory", Icons.Default.CheckCircle, "Inventory"),
-        NavigationItem("Item Masters", Icons.Default.Build, "Masters"),
-        NavigationItem("Account Ledger", Icons.Default.AccountBox, "Accounts"),
-        NavigationItem("Production / Jobs", Icons.Default.Refresh, "Processes"),
-        NavigationItem("Reports Center", Icons.AutoMirrored.Filled.List, "Reports"),
-        NavigationItem("System Settings", Icons.Default.Settings, "Settings")
+fun MainAppScreen(onNavigateToModule: (String) -> Unit, onLogout: () -> Unit) {
+    
+    val allModules = listOf(
+        AppModuleItem("Sales & Billing", Icons.Default.ShoppingCart, "Billing"),
+        AppModuleItem("Inventory", Icons.AutoMirrored.Filled.List, "Inventory"),
+        AppModuleItem("Purchases", Icons.Default.AddCircle, "Purchases"),
+        AppModuleItem("Item Master", Icons.Default.Build, "ItemMaster"),
+        AppModuleItem("Account Master", Icons.Default.Person, "AccountMaster"),
+        AppModuleItem("Reports", Icons.Default.Info, "Reports"),
+        AppModuleItem("Settings", Icons.Default.Settings, "Settings"),
+        AppModuleItem("User Management", Icons.Default.Lock, "AdminPanel", requiredRole = "Admin")
     )
 
-    val authorizedNavigationItems = allNavigationItems.filter { item ->
-        UserSession.hasAccessToModule(item.moduleKey)
+    // Filter modules based on Tenant-specific RBAC permissions
+    val authorizedModules = remember {
+        allModules.filter { module ->
+            UserSession.isMasterAdmin() || UserSession.hasPermission(module.moduleKey, "view")
+        }
     }
 
     Scaffold(
@@ -50,120 +57,102 @@ fun MainAppScreen() {
             TopAppBar(
                 title = {
                     Column {
+                        Text("FMS Console", fontWeight = FontWeight.Bold)
                         Text(
-                            text = "FMS Enterprise Portal",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Tenant: ${UserSession.companyId ?: "Unknown"} | Scope: ${UserSession.role ?: "Staff"}",
-                            style = MaterialTheme.typography.bodySmall,
+                            text = "${UserSession.companyName ?: "Business"} (${UserSession.companyId})",
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.secondary
                         )
                     }
                 },
+                actions = {
+                    if (UserSession.isImpersonating) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.error,
+                            shape = RoundedCornerShape(4.dp),
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Text(
+                                "SANDBOX MODE", 
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White
+                            )
+                        }
+                    }
+                    IconButton(onClick = onLogout) {
+                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Sign Out")
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
                 )
             )
         }
-    ) { innerPadding ->
-        Row(
+    ) { paddingValues ->
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(paddingValues)
+                .padding(16.dp)
         ) {
-            if (currentScreen == "Dashboard") {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    Text(
-                        text = "Operational Command Center",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(16.dp)
-                    )
-
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        contentPadding = PaddingValues(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(authorizedNavigationItems) { navItem ->
-                            Card(
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                                ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(120.dp)
-                                    .clickable { currentScreen = navItem.moduleKey }
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(16.dp),
-                                    verticalArrangement = Arrangement.Center,
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Icon(
-                                        imageVector = navItem.icon,
-                                        contentDescription = navItem.title,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = navItem.title,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
+            // SaaS Banner: Displaying License Info
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Subscription: ${UserSession.subscriptionTier}", fontWeight = FontWeight.Bold)
+                        Text("User Role: ${UserSession.role}", style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (UserSession.isMasterAdmin()) {
+                        Icon(Icons.Default.Star, contentDescription = "Master Access", tint = Color(0xFFFFD700))
                     }
                 }
-            } else {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    when (currentScreen) {
-                        "Billing" -> BillingScreen()
-                        "Transactions" -> PurchaseInwardScreen()
-                        "Inventory" -> InventoryScreen()
-                        "Masters" -> ItemMasterScreen()
-                        "Accounts" -> AccountMasterScreen()
-                        "Processes" -> ProductionScreen()
-                        "Reports" -> ReportsScreen()
-                        "Settings" -> SettingsScreen()
-                        else -> {
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.Center,
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text("Module Not Configured")
-                                Button(onClick = { currentScreen = "Dashboard" }) {
-                                    Text("Return to Hub")
-                                }
-                            }
-                        }
-                    }
+            }
 
-                    Box(
+            Spacer(modifier = Modifier.height(24.dp))
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(authorizedModules) { module ->
+                    Card(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        contentAlignment = Alignment.BottomStart
+                            .fillMaxWidth()
+                            .height(140.dp)
+                            .clickable { onNavigateToModule(module.moduleKey) },
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        )
                     ) {
-                        Button(
-                            onClick = { currentScreen = "Dashboard" },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer
-                            )
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Hub")
+                            Icon(
+                                imageVector = module.icon,
+                                contentDescription = module.name,
+                                modifier = Modifier.size(40.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = module.name,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
                         }
                     }
                 }

@@ -1,4 +1,4 @@
-package com.fms.app.admin
+package com.fms.app.ui.theme.admin
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf

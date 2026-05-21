@@ -1,47 +1,74 @@
 package com.fms.app.data
 
+/**
+ * UserSession: The central authority for the current user's identity and permissions.
+ * Designed for Multi-Tenant SaaS (Principal Architect Level).
+ */
 object UserSession {
+    // Basic Identity
     var userId: String? = null
-    var companyId: String? = null
-    var role: String? = null // Supported roles: MasterAdmin, Admin, Cashier, InventoryManager
+    var role: String? = null
+    
+    // Multi-Tenancy
+    var companyId: String? = null // The current active tenant ID
+    var companyName: String? = null
+    var originalCompanyId: String? = null // For Master Admin impersonation tracking
+    
+    // RBAC and SaaS Governance
+    var isImpersonating: Boolean = false
+    var permissions: Map<String, Map<String, Boolean>>? = null
+    var subscriptionTier: String = "Free" // Free, Pro, Enterprise
+    var maxUsersAllowed: Int = 5
+    var isAccountActive: Boolean = true
 
     /**
-     * Checks if the currently authenticated session possesses Master Administrator clearance.
+     * Master Admin (God Tier) Check
      */
-    fun isMasterAdmin(): Boolean {
-        return role == "MasterAdmin"
+    fun isMasterAdmin(): Boolean = role == "MasterAdmin"
+
+    /**
+     * RBAC Check: Validates if the user can perform a specific action in a module.
+     * Master Admins bypass all checks.
+     */
+    fun hasPermission(module: String, action: String): Boolean {
+        if (isMasterAdmin()) return true
+        if (!isAccountActive) return false
+        return permissions?.get(module)?.get(action) ?: false
     }
 
     /**
-     * Enforces operational capabilities across tenant boundaries.
-     * Maps authorization rules cleanly to prevent non-privileged personnel from accessing restricted operations.
+     * Multi-Tenant Impersonation: Allows Master Admin to jump into any company context.
      */
-    fun hasAccessToModule(moduleName: String): Boolean {
-        if (role == "MasterAdmin") return true
+    fun startImpersonation(targetTenantId: String) {
+        if (!isMasterAdmin()) return
+        if (originalCompanyId == null) {
+            originalCompanyId = companyId
+        }
+        companyId = targetTenantId
+        isImpersonating = true
+    }
 
-        return when (role) {
-            "Admin" -> {
-                // Admins have unfettered access to all local business operational nodes
-                true
-            }
-            "Cashier" -> {
-                // Cashiers are restricted exclusively to sales environments, invoice generation, and customer indexing
-                moduleName == "Billing" || moduleName == "Accounts" || moduleName == "Dashboard"
-            }
-            "InventoryManager" -> {
-                // Inventory Managers are restricted to materials cataloging, inward goods, and consumption logs
-                moduleName == "Inventory" || moduleName == "Masters" || moduleName == "Processes" || moduleName == "Transactions" || moduleName == "Dashboard"
-            }
-            else -> false
+    fun stopImpersonation() {
+        if (isImpersonating) {
+            companyId = originalCompanyId
+            originalCompanyId = null
+            isImpersonating = false
         }
     }
 
     /**
-     * Purges authorization cache context safely during termination sequences.
+     * Session Cleanup on Logout
      */
     fun clear() {
         userId = null
         companyId = null
+        companyName = null
         role = null
+        originalCompanyId = null
+        isImpersonating = false
+        permissions = null
+        subscriptionTier = "Free"
+        maxUsersAllowed = 5
+        isAccountActive = true
     }
 }

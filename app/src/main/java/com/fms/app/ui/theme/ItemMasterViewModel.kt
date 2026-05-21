@@ -7,10 +7,14 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.fms.app.data.FirebaseRepository
 
+/**
+ * ItemMasterViewModel: Manages the product/item catalog for a specific tenant.
+ * Adheres to the SaaS architecture by using the centralized FirebaseRepository.
+ */
 class ItemMasterViewModel : ViewModel() {
 
     // State collection to store the items belonging to the active tenant
-    val items = mutableStateListOf<Map<String, String>>()
+    val items = mutableStateListOf<Map<String, Any>>()
 
     var isLoading by mutableStateOf(false)
         private set
@@ -42,10 +46,24 @@ class ItemMasterViewModel : ViewModel() {
         onResult: (Boolean) -> Unit
     ) {
         isLoading = true
-        FirebaseRepository.saveDynamicRecord("Masters", id, data) { success ->
+        FirebaseRepository.saveItem("Masters", id, data) { success ->
             isLoading = false
             if (success) {
                 // Refresh local state after successful tenant-scoped persistence
+                loadItems()
+            }
+            onResult(success)
+        }
+    }
+
+    /**
+     * Deletes an item from the tenant's catalog.
+     */
+    fun deleteItem(id: String, onResult: (Boolean) -> Unit) {
+        isLoading = true
+        FirebaseRepository.deleteItem("Masters", id) { success ->
+            isLoading = false
+            if (success) {
                 loadItems()
             }
             onResult(success)

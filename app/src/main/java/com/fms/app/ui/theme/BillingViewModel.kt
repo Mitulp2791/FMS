@@ -7,75 +7,107 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.fms.app.data.FirebaseRepository
 
+/**
+ * BillingViewModel: Handles sales transactions with atomic inventory deductions.
+ * Optimized for Multi-Tenant SaaS with strict data integrity.
+ */
 class BillingViewModel : ViewModel() {
-    val items = mutableStateListOf<Map<String, String>>()
-    val cart = mutableStateListOf<Map<String, Any>>()
-
-    var isLoading by mutableStateOf(false)
-        private set
+    
+    // UI State: Available items for sale
+    val availableItems = mutableStateListOf<Map<String, Any>>()
+    
+    // UI State: Cart
+    val cartItems = mutableStateListOf<Map<String, Any>>()
+    var customerName = mutableStateOf("")
+    var totalAmount = mutableStateOf(0.0)
+    var isProcessing by mutableStateOf(false)
     var statusMessage by mutableStateOf<String?>(null)
-        private set
 
     init {
-        loadInventory()
+        loadAvailableItems()
     }
 
-    private fun loadInventory() {
-        isLoading = true
-        FirebaseRepository.getAllItems { fetchedItems ->
-            items.clear()
-            items.addAll(fetchedItems)
-            isLoading = false
+    /**
+     * Fetches items from the tenant's master catalog.
+     */
+    fun loadAvailableItems() {
+        FirebaseRepository.getAllItems { items ->
+            availableItems.clear()
+            availableItems.addAll(items)
         }
     }
 
-    fun addToCart(item: Map<String, String>, qty: Double) {
-        val price = item["costPerUnit"]?.toDoubleOrNull() ?: 0.0
-        val cartItem = mapOf(
-            "itemId" to (item["id"] ?: ""),
-            "name" to (item["name"] ?: "Unknown"),
-            "qty" to qty,
-            "price" to price,
-            "lineTotal" to (qty * price)
-        )
-        cart.add(cartItem)
+    /**
+     * Adds an item to the current billing session.
+     */
+    fun addToCart(item: Map<String, Any>, qty: Double) {
+        val cartItem = item.toMutableMap()
+        cartItem["qty"] = qty
+        cartItems.add(cartItem)
+        calculateTotal()
     }
 
-    fun processSale(
-        customerName: String,
-        customerMobile: String,
-        isGst: Boolean,
-        gstValue: Double,
-        gstType: String
-    ) {
-        if (cart.isEmpty()) {
-            statusMessage = "Cart is empty."
-            return
+    /**
+     * Removes an item from the cart.
+     */
+    fun removeFromCart(index: Int) {
+        if (index in cartItems.indices) {
+            cartItems.removeAt(index)
+            calculateTotal()
         }
+    }
 
-        isLoading = true
-        val baseAmount = cart.sumOf { it["lineTotal"]?.toString()?.toDoubleOrNull() ?: 0.0 }
-        val grandTotal = baseAmount + gstValue
-
-        FirebaseRepository.createInvoice(
-            customerId = "WALKIN",
-            customerName = customerName,
-            customerMobile = customerMobile,
-            items = cart.toList(),
-            baseAmount = baseAmount,
-            isGstApplicable = isGst,
-            gstType = gstType,
-            totalGst = gstValue,
-            grandTotal = grandTotal,
-            saleType = "RETAIL"
-        )
-
-        isLoading = false
-        statusMessage = "Invoice Generated Successfully."
-        cart.clear()
+    private fun calculateTotal() {
+        totalAmount.value = cartItems.sumOf { 
+            val price = (it["price"] as? Number)?.toDouble() ?: (it["costPerUnit"] as? Number)?.toDouble() ?: 0.0
+            val qty = (it["qty"] as? Number)?.toDouble() ?: 0.0
+            price * qty 
+        }
     }
 
     fun clearStatus() {
         statusMessage = null
+    }
+
+    /**
+     * Finalizes the sale using a Firebase Transaction.
+     * This ensures the Invoice is created and Stock is deducted atomically.
+     */
+    fun finalizeInvoice(onComplete: (Boolean) -> Unit) {
+        if (cartItems.isEmpty()) {
+            statusMessage = "Cart is empty"
+            onComplete(false)
+            return
+        }
+        
+        isProcessing = true
+        
+        val invoiceData = mapOf(
+            "customerName" to customerName.value,
+            "totalAmount" to totalAmount.value,
+            "itemCount" to cartItems.size,
+            "status" to "COMPLETED"
+        )
+
+        // Convert cart items to a simplified list for the repository
+        val itemsToDeduct = cartItems.map { 
+            mapOf(
+                "itemId" to (it["id"] ?: it["name"] ?: ""),
+                "qty" to (it["qty"] ?: 0.0)
+            )
+        }
+
+        FirebaseRepository.createInvoice(invoiceData, itemsToDeduct) { success ->
+            isProcessing = false
+            if (success) {
+                cartItems.clear()
+                customerName.value = ""
+                totalAmount.value = 0.0
+                statusMessage = "Sale completed successfully!"
+            } else {
+                statusMessage = "Error processing sale. Please check connectivity."
+            }
+            onComplete(success)
+        }
     }
 }

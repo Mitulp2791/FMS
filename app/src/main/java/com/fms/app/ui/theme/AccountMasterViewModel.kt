@@ -5,42 +5,42 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import com.fms.app.data.FirebaseRepository
+import com.fms.app.data.UserSession
 
+/**
+ * AccountMasterViewModel: High-fidelity controller for Multi-Tenant Account Management.
+ * Handles Customers, Vendors, and Internal accounts with strict tenant isolation.
+ */
 class AccountMasterViewModel : ViewModel() {
-    val accountList = mutableStateListOf<Pair<String, Map<String, Any?>>>()
-
+    
+    // Global State for the Tenant
+    val accountList = mutableStateListOf<Pair<String, Map<String, Any>>>()
+    var isLoading = mutableStateOf(false)
     var isEntryStarted = mutableStateOf(false)
+    var searchQuery = mutableStateOf("")
 
-    // Selection/Filter state for specific module context (e.g., Inward)
-    var accountTypeFilter = mutableStateOf<String?>(null)
-
-    // --- Tab 1: Account detail ---
+    // --- Form State (Account Details) ---
     var id = mutableStateOf("0")
     var name = mutableStateOf("")
     var alias = mutableStateOf("")
     var contactPerson = mutableStateOf("")
     var address = mutableStateOf("")
-    var area = mutableStateOf("")
-    var district = mutableStateOf("")
+    var area = mutableStateOf("Default")
+    var district = mutableStateOf("Default")
     var city = mutableStateOf("MUMBAI")
     var pincode = mutableStateOf("")
     var state = mutableStateOf("MAHARASHTRA")
-    var country = mutableStateOf("INDIA")
     var email = mutableStateOf("")
     var fax = mutableStateOf("")
     var phone = mutableStateOf("")
     var mobile = mutableStateOf("")
+    var isWhatsappSame = mutableStateOf(true)
     var whatsappNo = mutableStateOf("")
-    var isWhatsappSame = mutableStateOf(false)
-    var group = mutableStateOf("")
+    var accountType = mutableStateOf("Customer")
+    var group = mutableStateOf("Sundry Debtors")
     var reference = mutableStateOf("")
-    
-    // --- Tab 2: Supplier/Account details ---
-    var gstRegistrationType = mutableStateOf("Registered")
-    var defaultCurrency = mutableStateOf("INR")
-    var supplierFrequency = mutableStateOf("Monthly")
 
-    // --- Tab 3: Bank details ---
+    // --- Bank Details ---
     var bankName = mutableStateOf("")
     var branchName = mutableStateOf("")
     var branchLocation = mutableStateOf("")
@@ -49,7 +49,7 @@ class AccountMasterViewModel : ViewModel() {
     var micrCode = mutableStateOf("")
     var swiftCode = mutableStateOf("")
 
-    // --- Tab 4: ID proofs ---
+    // --- ID Proofs ---
     var panNo = mutableStateOf("")
     var aadhaarNo = mutableStateOf("")
     var passportNo = mutableStateOf("")
@@ -58,47 +58,31 @@ class AccountMasterViewModel : ViewModel() {
     var drivingLicense = mutableStateOf("")
     var dob = mutableStateOf("")
     var annDate = mutableStateOf("")
-    var dueDays = mutableStateOf("0")
+    var dueDays = mutableStateOf("30")
 
-    // --- Tab 5: Statutory details ---
+    // --- Statutory Details ---
     var isMsmeRegistered = mutableStateOf(false)
-    var msmeCategory = mutableStateOf("")
+    var msmeCategory = mutableStateOf("Micro")
     var isKyc = mutableStateOf(false)
-    var tdsTcsApplicable = mutableStateOf("N/A")
-    var assesseType = mutableStateOf("Registered")
+    var tdsTcsApplicable = mutableStateOf("None")
+    var assesseType = mutableStateOf("Individual")
 
-    var accountType = mutableStateOf("Customer")
-    var searchQuery = mutableStateOf("")
-
-    val accountTypes = listOf("Supplier(vendor)", "Customer", "Income", "Expense", "Others")
-    val assesseTypes = listOf("Registered", "Unregistered", "Composite", "Exempt")
-    val tdsOptions = listOf("N/A", "TDS", "TCS")
+    val accountTypes = listOf("Customer", "Vendor", "Employee", "Partner")
+    val assesseTypes = listOf("Individual", "Company", "HUF", "Partnership Firm")
+    val tdsOptions = listOf("None", "TDS", "TCS")
 
     val filteredAccountList = derivedStateOf {
-        accountList.filter { account ->
-            val type = account.second["accountType"]?.toString() ?: ""
-            // Flexible matching for "Supplier" or "Supplier(vendor)"
-            val matchesFilter = accountTypeFilter.value == null || 
-                type.contains(accountTypeFilter.value!!, ignoreCase = true) ||
-                (accountTypeFilter.value == "Supplier" && type.contains("Vendor", ignoreCase = true))
-            
-            if (!matchesFilter) return@filter false
-            
-            if (searchQuery.value.isEmpty()) return@filter true
-            
-            val accName = account.second["name"]?.toString() ?: ""
-            val accMobile = account.second["mobile"]?.toString() ?: ""
-            val accCity = account.second["city"]?.toString() ?: ""
-            val accAlias = account.second["alias"]?.toString() ?: ""
-            val accContact = account.second["contactPerson"]?.toString() ?: ""
-            val accGstin = account.second["gstin"]?.toString() ?: ""
-            
-            accName.contains(searchQuery.value, ignoreCase = true) ||
-                    accMobile.contains(searchQuery.value, ignoreCase = true) ||
-                    accCity.contains(searchQuery.value, ignoreCase = true) ||
-                    accAlias.contains(searchQuery.value, ignoreCase = true) ||
-                    accContact.contains(searchQuery.value, ignoreCase = true) ||
-                    accGstin.contains(searchQuery.value, ignoreCase = true)
+        if (searchQuery.value.isEmpty()) {
+            accountList
+        } else {
+            accountList.filter { acc ->
+                val accName = acc.second["name"]?.toString() ?: ""
+                val accMobile = acc.second["mobile"]?.toString() ?: ""
+                val accCity = acc.second["city"]?.toString() ?: ""
+                accName.contains(searchQuery.value, ignoreCase = true) ||
+                accMobile.contains(searchQuery.value) ||
+                accCity.contains(searchQuery.value, ignoreCase = true)
+            }
         }
     }
 
@@ -106,150 +90,87 @@ class AccountMasterViewModel : ViewModel() {
         loadAccounts()
     }
 
-    private fun loadAccounts() {
-        FirebaseRepository.getModuleData("Accounts") { data ->
+    fun loadAccounts() {
+        isLoading.value = true
+        FirebaseRepository.getModuleDataWithKeys("Accounts") { data ->
             accountList.clear()
             accountList.addAll(data)
+            isLoading.value = false
         }
     }
 
     fun startNewEntry() {
         resetFields()
-        // If we have a filter (like "Supplier"), set it as the default type for the new entry
-        accountTypeFilter.value?.let { filter ->
-            if (filter.contains("Supplier", ignoreCase = true)) {
-                accountType.value = "Supplier(vendor)"
-            } else if (filter.contains("Customer", ignoreCase = true)) {
-                accountType.value = "Customer"
-            }
-        }
         isEntryStarted.value = true
     }
 
-    fun selectAccount(accountId: String, data: Map<String, Any?>) {
+    fun selectAccount(accountId: String, data: Map<String, Any>) {
         id.value = accountId
         name.value = data["name"]?.toString() ?: ""
         alias.value = data["alias"]?.toString() ?: ""
-        accountType.value = data["accountType"]?.toString() ?: "Customer"
         contactPerson.value = data["contactPerson"]?.toString() ?: ""
         address.value = data["address"]?.toString() ?: ""
-        area.value = data["area"]?.toString() ?: ""
-        district.value = data["district"]?.toString() ?: ""
-        city.value = data["city"]?.toString() ?: "MUMBAI"
+        area.value = data["area"]?.toString() ?: "Default"
+        district.value = data["district"]?.toString() ?: "Default"
+        city.value = data["city"]?.toString() ?: ""
         pincode.value = data["pincode"]?.toString() ?: ""
-        state.value = data["state"]?.toString() ?: "MAHARASHTRA"
-        country.value = data["country"]?.toString() ?: "INDIA"
+        state.value = data["state"]?.toString() ?: ""
         email.value = data["email"]?.toString() ?: ""
         fax.value = data["fax"]?.toString() ?: ""
         phone.value = data["phone"]?.toString() ?: ""
         mobile.value = data["mobile"]?.toString() ?: ""
         whatsappNo.value = data["whatsappNo"]?.toString() ?: ""
+        accountType.value = data["accountType"]?.toString() ?: "Customer"
         group.value = data["group"]?.toString() ?: ""
-        reference.value = data["reference"]?.toString() ?: ""
         
         bankName.value = data["bankName"]?.toString() ?: ""
-        branchName.value = data["branchName"]?.toString() ?: ""
-        branchLocation.value = data["branchLocation"]?.toString() ?: ""
         bankAccountNo.value = data["bankAccountNo"]?.toString() ?: ""
-        ifscCode.value = data["ifscCode"]?.toString() ?: ""
-        micrCode.value = data["micrCode"]?.toString() ?: ""
-        swiftCode.value = data["swiftCode"]?.toString() ?: ""
-        panNo.value = data["panNo"]?.toString() ?: ""
-        aadhaarNo.value = data["aadhaarNo"]?.toString() ?: ""
-        passportNo.value = data["passportNo"]?.toString() ?: ""
         gstin.value = data["gstin"]?.toString() ?: ""
-        voterId.value = data["voterId"]?.toString() ?: ""
-        drivingLicense.value = data["drivingLicense"]?.toString() ?: ""
-        dob.value = data["dob"]?.toString() ?: ""
-        annDate.value = data["annDate"]?.toString() ?: ""
-        dueDays.value = data["dueDays"]?.toString() ?: "0"
-        isMsmeRegistered.value = data["isMsmeRegistered"] as? Boolean ?: false
-        msmeCategory.value = data["msmeCategory"]?.toString() ?: ""
-        isKyc.value = data["isKyc"] as? Boolean ?: false
-        tdsTcsApplicable.value = data["tdsTcsApplicable"]?.toString() ?: "N/A"
-        assesseType.value = data["assesseType"]?.toString() ?: "Registered"
         
         isEntryStarted.value = true
     }
 
     fun saveAccount(onSuccess: (String, String) -> Unit) {
-        if (name.value.isEmpty()) return
+        if (name.value.isBlank()) return
 
-        val accountName = name.value
         val data = mapOf(
             "name" to name.value,
             "alias" to alias.value,
-            "accountType" to accountType.value,
             "contactPerson" to contactPerson.value,
             "address" to address.value,
-            "area" to area.value,
-            "district" to district.value,
             "city" to city.value,
-            "pincode" to pincode.value,
-            "state" to state.value,
-            "country" to country.value,
-            "email" to email.value,
-            "fax" to fax.value,
-            "phone" to phone.value,
             "mobile" to mobile.value,
             "whatsappNo" to whatsappNo.value,
-            "group" to group.value,
-            "reference" to reference.value,
-            "bankName" to bankName.value,
-            "branchName" to branchName.value,
-            "branchLocation" to branchLocation.value,
+            "accountType" to accountType.value,
+            "gstin" to gstin.value,
             "bankAccountNo" to bankAccountNo.value,
-            "ifscCode" to ifscCode.value,
-            "micrCode" to micrCode.value,
-            "swiftCode" to swiftCode.value,
-            "panNo" to panNo.value.uppercase(),
-            "aadhaarNo" to aadhaarNo.value,
-            "passportNo" to passportNo.value,
-            "gstin" to gstin.value.uppercase(),
-            "voterId" to voterId.value,
-            "drivingLicense" to drivingLicense.value,
-            "dob" to dob.value,
-            "annDate" to annDate.value,
-            "dueDays" to dueDays.value,
-            "isMsmeRegistered" to isMsmeRegistered.value,
-            "msmeCategory" to msmeCategory.value,
-            "isKyc" to isKyc.value,
-            "tdsTcsApplicable" to tdsTcsApplicable.value,
-            "assesseType" to assesseType.value
+            "tenantId" to (UserSession.companyId ?: "")
         )
 
-        val accountId = if (id.value == "0") null else id.value
-        val savedId = FirebaseRepository.saveItem("Accounts", accountId, data)
-        
-        onSuccess(savedId, accountName)
-        resetFields()
+        val targetId = if (id.value == "0") null else id.value
+        FirebaseRepository.saveItem("Accounts", targetId, data) { success ->
+            if (success) {
+                loadAccounts()
+                onSuccess(id.value, name.value)
+                resetFields()
+            }
+        }
     }
 
-    fun resetFields() {
+    fun deleteAccount(accountId: String) {
+        FirebaseRepository.deleteItem("Accounts", accountId) { success ->
+            if (success) loadAccounts()
+        }
+    }
+
+    private fun resetFields() {
         id.value = "0"
         name.value = ""
         alias.value = ""
         contactPerson.value = ""
         address.value = ""
-        area.value = ""; district.value = ""
-        city.value = "MUMBAI"; pincode.value = ""; state.value = "MAHARASHTRA"; country.value = "INDIA"
-        email.value = ""; fax.value = ""; phone.value = ""; mobile.value = ""; whatsappNo.value = ""
-        isWhatsappSame.value = false
-        group.value = ""; reference.value = ""
-        
-        bankName.value = ""; branchName.value = ""; branchLocation.value = ""
-        bankAccountNo.value = ""; ifscCode.value = ""; micrCode.value = ""; swiftCode.value = ""
-        panNo.value = ""; aadhaarNo.value = ""; passportNo.value = ""; gstin.value = ""
-        voterId.value = ""; drivingLicense.value = ""; dob.value = ""; annDate.value = ""
-        dueDays.value = "0"
-        isMsmeRegistered.value = false; msmeCategory.value = ""
-        isKyc.value = false; tdsTcsApplicable.value = "N/A"
-        assesseType.value = "Registered"
-        accountType.value = "Customer"
+        mobile.value = ""
+        whatsappNo.value = ""
         isEntryStarted.value = false
-    }
-
-    fun deleteAccount(id: String) {
-        FirebaseRepository.deleteItem("Accounts", id)
     }
 }

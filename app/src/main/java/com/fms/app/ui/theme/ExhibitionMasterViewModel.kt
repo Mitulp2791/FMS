@@ -6,11 +6,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import com.fms.app.data.FirebaseRepository
 
+/**
+ * ExhibitionMasterViewModel: Manages trade shows and exhibitions for the tenant.
+ * Ensures all entries are strictly isolated to the companyId in context.
+ */
 class ExhibitionMasterViewModel : ViewModel() {
-    val exhibitionList = mutableStateListOf<Pair<String, Map<String, Any?>>>()
+    
+    // List of exhibitions: Pair of <FirebaseKey, DataMap>
+    val exhibitionList = mutableStateListOf<Pair<String, Map<String, Any>>>()
 
     var isEntryStarted = mutableStateOf(false)
+    var isLoading = mutableStateOf(false)
 
+    // Form State
     var id = mutableStateOf("0")
     var exhibitorName = mutableStateOf("")
     var location = mutableStateOf("")
@@ -19,6 +27,9 @@ class ExhibitionMasterViewModel : ViewModel() {
 
     var searchQuery = mutableStateOf("")
 
+    /**
+     * Filtered list based on search query (Name or Location).
+     */
     val filteredExhibitionList = derivedStateOf {
         if (searchQuery.value.isEmpty()) {
             exhibitionList
@@ -36,10 +47,15 @@ class ExhibitionMasterViewModel : ViewModel() {
         loadExhibitions()
     }
 
-    private fun loadExhibitions() {
-        FirebaseRepository.getModuleData("Exhibitions") { data ->
+    /**
+     * Loads exhibitions from the tenant-scoped repository.
+     */
+    fun loadExhibitions() {
+        isLoading.value = true
+        FirebaseRepository.getModuleDataWithKeys("Exhibitions") { data ->
             exhibitionList.clear()
             exhibitionList.addAll(data)
+            isLoading.value = false
         }
     }
 
@@ -48,7 +64,10 @@ class ExhibitionMasterViewModel : ViewModel() {
         isEntryStarted.value = true
     }
 
-    fun selectExhibition(exId: String, data: Map<String, Any?>) {
+    /**
+     * Prepares the form for editing an existing exhibition.
+     */
+    fun selectExhibition(exId: String, data: Map<String, Any>) {
         id.value = exId
         exhibitorName.value = data["exhibitorName"]?.toString() ?: ""
         location.value = data["location"]?.toString() ?: ""
@@ -57,6 +76,9 @@ class ExhibitionMasterViewModel : ViewModel() {
         isEntryStarted.value = true
     }
 
+    /**
+     * Persists the exhibition data to Firebase under the tenant path.
+     */
     fun saveExhibition(onSuccess: () -> Unit) {
         if (exhibitorName.value.isEmpty()) return
 
@@ -67,9 +89,15 @@ class ExhibitionMasterViewModel : ViewModel() {
             "toDate" to toDate.value
         )
 
-        FirebaseRepository.saveItem("Exhibitions", if (id.value == "0") null else id.value, data)
-        resetFields()
-        onSuccess()
+        val targetId = if (id.value == "0") null else id.value
+        
+        FirebaseRepository.saveItem("Exhibitions", targetId, data) { success ->
+            if (success) {
+                loadExhibitions()
+                resetFields()
+                onSuccess()
+            }
+        }
     }
 
     fun resetFields() {
@@ -81,7 +109,14 @@ class ExhibitionMasterViewModel : ViewModel() {
         isEntryStarted.value = false
     }
 
-    fun deleteExhibition(id: String) {
-        FirebaseRepository.deleteItem("Exhibitions", id)
+    /**
+     * Removes the exhibition from the tenant's record.
+     */
+    fun deleteExhibition(exId: String) {
+        FirebaseRepository.deleteItem("Exhibitions", exId) { success ->
+            if (success) {
+                loadExhibitions()
+            }
+        }
     }
 }

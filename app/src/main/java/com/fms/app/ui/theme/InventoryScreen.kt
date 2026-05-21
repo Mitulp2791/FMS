@@ -29,6 +29,11 @@ fun InventoryScreen(viewModel: InventoryViewModel = viewModel()) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(viewModel.stockItems) { entry ->
+                    val id = entry["id"]?.toString() ?: ""
+                    val type = entry["type"]?.toString() ?: "N/A"
+                    val changeString = entry["change"]?.toString() ?: "0"
+                    val changeValue = changeString.toDoubleOrNull() ?: 0.0
+
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
@@ -42,21 +47,21 @@ fun InventoryScreen(viewModel: InventoryViewModel = viewModel()) {
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    text = "Ref: ${entry["id"]?.takeLast(5)}",
+                                    text = "Ref: ${if (id.length >= 5) id.takeLast(5) else id}",
                                     style = MaterialTheme.typography.labelSmall
                                 )
                                 Text(
-                                    text = entry["type"] ?: "N/A",
+                                    text = type,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.primary
                                 )
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Change: ${entry["change"]}",
+                                text = "Change: $changeString",
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = if ((entry["change"]?.toDoubleOrNull() ?: 0.0) >= 0) Color(0xFF2E7D32) else Color(0xFFC62828)
+                                color = if (changeValue >= 0) Color(0xFF2E7D32) else Color(0xFFC62828)
                             )
                         }
                     }

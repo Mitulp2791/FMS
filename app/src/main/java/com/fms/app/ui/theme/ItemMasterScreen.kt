@@ -68,10 +68,9 @@ fun ItemMasterScreen(viewModel: ItemMasterViewModel = viewModel()) {
                 items(viewModel.items) { item ->
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            // Accessing data via Map key (Fixing the Unresolved Reference errors)
-                            Text(text = item["name"] ?: "Unknown Item", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Text(text = "Category: ${item["category"] ?: "N/A"}")
-                            Text(text = "Price: ${item["costPerUnit"] ?: "0.0"}")
+                            Text(text = item["name"]?.toString() ?: "Unknown Item", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(text = "Category: ${item["category"]?.toString() ?: "N/A"}")
+                            Text(text = "Price: ${item["costPerUnit"]?.toString() ?: "0.0"}")
                         }
                     }
                 }

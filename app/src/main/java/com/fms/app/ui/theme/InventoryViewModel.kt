@@ -6,46 +6,46 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.fms.app.data.FirebaseRepository
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
-import com.fms.app.data.UserSession
 
+/**
+ * InventoryViewModel: Manages the stock ledger and real-time inventory levels.
+ * Strictly isolated by Tenant ID.
+ */
 class InventoryViewModel : ViewModel() {
-    val stockItems = mutableStateListOf<Map<String, String>>()
+    
+    // UI State: List of ledger entries
+    val stockItems = mutableStateListOf<Map<String, Any>>()
+    
+    // UI State: Current stock levels by item
+    val currentStocks = mutableStateListOf<Pair<String, Double>>()
+
     var isLoading by mutableStateOf(false)
         private set
 
     init {
-        fetchInventoryState()
+        refreshInventory()
     }
 
-    private fun fetchInventoryState() {
+    /**
+     * Pulls the latest ledger and stock snapshots for the current tenant.
+     */
+    fun refreshInventory() {
         isLoading = true
-        // Scoped to the current tenant path defined in Repository
-        val dbRef = FirebaseDatabase.getInstance()
-            .getReference("Businesses/${UserSession.companyId ?: "UNAUTHORIZED_TENANT"}/Inventory/StockLedger")
-
-        dbRef.addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val ledger = mutableListOf<Map<String, String>>()
-                for (child in snapshot.children) {
-                    val entry = mutableMapOf<String, String>()
-                    entry["id"] = child.key ?: ""
-                    for (prop in child.children) {
-                        entry[prop.key ?: ""] = prop.value?.toString() ?: ""
-                    }
-                    ledger.add(entry)
+        
+        // 1. Fetch Ledger Entries
+        FirebaseRepository.getModuleData<Map<String, Any>>("Inventory/StockLedger") { ledger ->
+            stockItems.clear()
+            stockItems.addAll(ledger.reversed()) // Show latest first
+            
+            // 2. Fetch Current Stock Levels
+            FirebaseRepository.getModuleDataWithKeys("Inventory/Stocks") { stocks ->
+                val snapshot = stocks.map { (id, data) ->
+                    id to ((data["currentStock"] as? Number)?.toDouble() ?: 0.0)
                 }
-                stockItems.clear()
-                stockItems.addAll(ledger)
+                currentStocks.clear()
+                currentStocks.addAll(snapshot)
                 isLoading = false
             }
-
-            override fun onCancelled(error: DatabaseError) {
-                isLoading = false
-            }
-        })
+        }
     }
 }

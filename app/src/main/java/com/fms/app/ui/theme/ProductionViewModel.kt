@@ -1,112 +1,104 @@
 package com.fms.app.ui.theme
 
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import com.fms.app.data.FirebaseRepository
 
 class ProductionViewModel : ViewModel() {
-    val masterItems = mutableStateListOf<Pair<String, Map<String, Any?>>>()
     
-    // Live stock tracker for Raw Materials
-    val stockLevels = mutableStateMapOf<String, Double>()
-
-    // Separation of RM and FG based on Category
-    val finishedGoods get() = masterItems.filter { it.second["type"] == "FG" }
-    val rawMaterials get() = masterItems.filter { it.second["type"] == "RM" }
-
-    // Output Data
     var selectedFgId = mutableStateOf("")
-    var selectedFgName = mutableStateOf("Select Finished Good")
-    var yieldQty = mutableStateOf("")
+    var selectedFgName = mutableStateOf("")
     var batchNumber = mutableStateOf("")
+    var yieldQty = mutableStateOf("")
     var laborCost = mutableStateOf("")
 
-    // BOM Input Data
     var selectedRmId = mutableStateOf("")
-    var selectedRmName = mutableStateOf("Select Material")
+    var selectedRmName = mutableStateOf("")
     var selectedRmCost = mutableStateOf(0.0)
     var rmQty = mutableStateOf("")
 
+    val finishedGoods = mutableStateListOf<Pair<String, Map<String, Any>>>()
+    val rawMaterials = mutableStateListOf<Pair<String, Map<String, Any>>>()
     val bomInputs = mutableStateListOf<Map<String, Any>>()
+    
+    private val stocks = mutableMapOf<String, Double>()
 
     init {
         loadData()
     }
 
     private fun loadData() {
-        FirebaseRepository.getModuleData("Masters") { data ->
-            masterItems.clear()
-            masterItems.addAll(data)
-        }
-        // Fetch inventory to calculate available RM stock
-        FirebaseRepository.getModuleData("Inventory") { ledger ->
-            stockLevels.clear()
-            ledger.forEach { entry ->
-                val itemId = entry.second["itemId"]?.toString() ?: ""
-                val change = (entry.second["change"] as? Number)?.toDouble() ?: 0.0
-                if (itemId.isNotEmpty()) {
-                    stockLevels[itemId] = (stockLevels[itemId] ?: 0.0) + change
+        FirebaseRepository.getModuleDataWithKeys("Masters") { items ->
+            finishedGoods.clear()
+            rawMaterials.clear()
+            items.forEach { (id, data) ->
+                val category = data["category"]?.toString()?.uppercase() ?: ""
+                if (category == "FINISHED GOOD" || category == "FG") {
+                    finishedGoods.add(id to data)
+                } else {
+                    rawMaterials.add(id to data)
                 }
+            }
+        }
+        
+        FirebaseRepository.getModuleDataWithKeys("Inventory/Stocks") { data ->
+            stocks.clear()
+            data.forEach { (id, value) ->
+                stocks[id] = (value["currentStock"] as? Number)?.toDouble() ?: 0.0
             }
         }
     }
 
-    fun getAvailableStock(itemId: String): Double {
-        val currentStock = stockLevels[itemId] ?: 0.0
-        val inBom = bomInputs.filter { it["itemId"] == itemId }.sumOf { it["qty"] as Double }
-        return currentStock - inBom
+    fun getAvailableStock(id: String): Double {
+        return stocks[id] ?: 0.0
     }
 
     fun addRmToBom(): String? {
-        val q = rmQty.value.toDoubleOrNull() ?: 0.0
-        val itemId = selectedRmId.value
-        
-        if (itemId.isEmpty()) return "Please select a material"
-        if (q <= 0) return "Quantity must be greater than 0"
-        
-        // SAFETY CHECK: Ensure we have enough RM stock
-        if (getAvailableStock(itemId) < q) {
-            return "Insufficient stock for ${selectedRmName.value}"
-        }
+        val id = selectedRmId.value
+        val name = selectedRmName.value
+        val qty = rmQty.value.toDoubleOrNull() ?: 0.0
+        val cost = selectedRmCost.value
 
+        if (id.isEmpty()) return "Select a material"
+        if (qty <= 0) return "Enter valid quantity"
+        
         bomInputs.add(mapOf(
-            "itemId" to itemId,
-            "name" to selectedRmName.value,
-            "qty" to q,
-            "unitCost" to selectedRmCost.value
+            "itemId" to id,
+            "name" to name,
+            "qty" to qty,
+            "unitCost" to cost
         ))
         
-        // Reset RM fields
+        // Reset RM selection
         selectedRmId.value = ""
-        selectedRmName.value = "Select Material"
+        selectedRmName.value = ""
+        selectedRmCost.value = 0.0
         rmQty.value = ""
-        return null // Success
+        
+        return null
     }
 
-    fun completeProduction(onSuccess: () -> Unit) {
-        val yQty = yieldQty.value.toDoubleOrNull() ?: 0.0
-        val lCost = laborCost.value.toDoubleOrNull() ?: 0.0
-        
-        if (selectedFgId.value.isNotEmpty() && bomInputs.isNotEmpty() && yQty > 0) {
-            FirebaseRepository.completeProduction(
-                selectedFgId.value,
-                selectedFgName.value,
-                yQty,
-                lCost,
-                batchNumber.value,
-                bomInputs.toList()
-            )
-            
-            // Reset fields
-            bomInputs.clear()
-            selectedFgId.value = ""
-            selectedFgName.value = "Select Finished Good"
-            yieldQty.value = ""
-            batchNumber.value = ""
-            laborCost.value = ""
-            onSuccess()
+    fun completeProduction(onComplete: () -> Unit) {
+        val productionData = mapOf(
+            "outputItem" to selectedFgId.value,
+            "outputQty" to (yieldQty.value.toDoubleOrNull() ?: 0.0),
+            "laborCost" to (laborCost.value.toDoubleOrNull() ?: 0.0),
+            "batch" to batchNumber.value
+        )
+
+        FirebaseRepository.completeProduction(productionData, bomInputs.toList()) { success ->
+            if (success) {
+                // Clear state
+                bomInputs.clear()
+                batchNumber.value = ""
+                yieldQty.value = ""
+                laborCost.value = ""
+                selectedFgId.value = ""
+                selectedFgName.value = ""
+                onComplete()
+                loadData() // Refresh stocks
+            }
         }
     }
 }

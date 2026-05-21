@@ -1,60 +1,25 @@
 package com.fms.app.data
 
 object ERPFieldSchema {
+    // Defines the structure for dynamic modules, now strictly enforcing tenant-wide consistency
+    private val schemaDefinitions = mapOf(
+        "Masters" to mapOf(
+            "name" to "String",
+            "alias" to "String",
+            "costPerUnit" to "Double",
+            "type" to "String" // RM or FG
+        ),
+        "Accounts" to mapOf(
+            "name" to "String",
+            "accountType" to "String",
+            "gstin" to "String",
+            "mobile" to "String"
+        )
+    )
 
-    /**
-     * Provides the specific field structure for each module of the ERP.
-     * This defines what inputs the user sees when adding or editing items.
-     * Multi-tenant architecture delegates 'tenantId' injection strictly to the Repository layer.
-     */
-    fun getSchema(module: String, onResult: (Map<String, String>) -> Unit) {
-        val schema = mutableMapOf<String, String>()
-
-        when(module) {
-            "Masters" -> {
-                schema["name"] = "String"
-                schema["costPerUnit"] = "Number"
-                schema["uom"] = "String (ML/PCS/KG/LTR)"
-                schema["category"] = "String"
-                schema["type"] = "String (RM/FG/SV)"
-                schema["hsn"] = "String"
-                schema["sku"] = "String"
-            }
-            "Accounts" -> {
-                schema["name"] = "String"
-                schema["accountType"] = "String (Customer/Supplier)"
-                schema["phone"] = "String"
-                schema["email"] = "String"
-                schema["city"] = "String"
-                schema["state"] = "String"
-                schema["country"] = "String"
-                schema["gstRegistrationType"] = "String"
-                schema["supplierFrequency"] = "String"
-                schema["defaultCurrency"] = "String"
-                schema["tdsTcsApplicable"] = "String"
-            }
-            "Inventory" -> {
-                schema["itemId"] = "String"
-                schema["change"] = "Number"
-                schema["type"] = "String"
-            }
-            "Processes" -> {
-                schema["processName"] = "String"
-                schema["outputItem"] = "String"
-                schema["outputQty"] = "Number"
-                schema["status"] = "String"
-            }
-            "Reports" -> {
-                schema["report_type"] = "String"
-                schema["date_range"] = "String"
-            }
-            "Transactions" -> {
-                schema["itemId"] = "String"
-                schema["qty"] = "Number"
-                schema["type"] = "String"
-                schema["date"] = "String"
-            }
-        }
-        onResult(schema)
+    fun getSchema(moduleName: String, onResult: (Map<String, String>) -> Unit) {
+        // In a SaaS model, schemas could eventually be tenant-customizable.
+        // For now, we return the base definition.
+        onResult(schemaDefinitions[moduleName] ?: emptyMap())
     }
 }
