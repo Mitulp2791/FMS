@@ -24,7 +24,7 @@ fun ProductionScreen(viewModel: ProductionViewModel = viewModel()) {
 
     var expandedFg by remember { mutableStateOf(false) }
     var expandedRm by remember { mutableStateOf(false) }
-    
+
     val selectedRmIdValue = viewModel.selectedRmId.value
     val availableRmStock = if (selectedRmIdValue.isNotEmpty()) {
         viewModel.getAvailableStock(selectedRmIdValue)
@@ -41,22 +41,22 @@ fun ProductionScreen(viewModel: ProductionViewModel = viewModel()) {
 
                 ExposedDropdownMenuBox(expanded = expandedFg, onExpandedChange = { expandedFg = !expandedFg }) {
                     OutlinedTextField(
-                        value = viewModel.selectedFgName.value, 
-                        onValueChange = {}, 
-                        readOnly = true, 
+                        value = viewModel.selectedFgName.value,
+                        onValueChange = {},
+                        readOnly = true,
                         label = { Text("Target Product") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedFg) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                        modifier = Modifier.menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth()
                     )
                     ExposedDropdownMenu(expanded = expandedFg, onDismissRequest = { expandedFg = false }) {
                         for (fg in viewModel.finishedGoods) {
                             val name = fg.second["name"]?.toString() ?: "Unknown"
                             DropdownMenuItem(
-                                text = { Text(name) }, 
-                                onClick = { 
+                                text = { Text(name) },
+                                onClick = {
                                     viewModel.selectedFgId.value = fg.first
                                     viewModel.selectedFgName.value = name
-                                    expandedFg = false 
+                                    expandedFg = false
                                 }
                             )
                         }
@@ -80,24 +80,24 @@ fun ProductionScreen(viewModel: ProductionViewModel = viewModel()) {
 
                 ExposedDropdownMenuBox(expanded = expandedRm, onExpandedChange = { expandedRm = !expandedRm }) {
                     OutlinedTextField(
-                        value = viewModel.selectedRmName.value, 
-                        onValueChange = {}, 
-                        readOnly = true, 
+                        value = viewModel.selectedRmName.value,
+                        onValueChange = {},
+                        readOnly = true,
                         label = { Text("Select Material") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedRm) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                        modifier = Modifier.menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth()
                     )
                     ExposedDropdownMenu(expanded = expandedRm, onDismissRequest = { expandedRm = false }) {
                         for (rm in viewModel.rawMaterials) {
                             val name = rm.second["name"]?.toString() ?: "Unknown"
                             val cost = (rm.second["costPerUnit"] as? Number)?.toDouble() ?: 0.0
                             DropdownMenuItem(
-                                text = { Text(name) }, 
-                                onClick = { 
+                                text = { Text(name) },
+                                onClick = {
                                     viewModel.selectedRmId.value = rm.first
                                     viewModel.selectedRmName.value = name
                                     viewModel.selectedRmCost.value = cost
-                                    expandedRm = false 
+                                    expandedRm = false
                                 }
                             )
                         }
@@ -114,16 +114,16 @@ fun ProductionScreen(viewModel: ProductionViewModel = viewModel()) {
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
-                        value = viewModel.rmQty.value, 
-                        onValueChange = { viewModel.rmQty.value = it }, 
-                        label = { Text("Qty") }, 
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
+                        value = viewModel.rmQty.value,
+                        onValueChange = { viewModel.rmQty.value = it },
+                        label = { Text("Qty") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f)
                     )
                     Button(
                         modifier = Modifier.weight(0.5f),
                         enabled = viewModel.selectedRmId.value.isNotEmpty() && (viewModel.rmQty.value.toDoubleOrNull() ?: 0.0) <= availableRmStock,
-                        onClick = { 
+                        onClick = {
                             val error = viewModel.addRmToBom()
                             if (error != null) {
                                 Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
@@ -152,29 +152,37 @@ fun ProductionScreen(viewModel: ProductionViewModel = viewModel()) {
                 val qty = (item["qty"] as? Number)?.toDouble() ?: 0.0
                 val unitCost = (item["unitCost"] as? Number)?.toDouble() ?: 0.0
                 val lineCost = qty * unitCost
+
+                val formattedUnitCost = String.format(Locale.US, "%.2f", unitCost)
+                val formattedLineCost = String.format(Locale.US, "%.2f", lineCost)
+
                 Card {
                     Row(modifier = Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
                             Text(item["name"]?.toString() ?: "Unknown", fontWeight = FontWeight.Bold)
-                            Text("$qty units @ ₹${String.format(Locale.US, "%.2f", unitCost)} WAC", style = MaterialTheme.typography.bodySmall)
+                            Text("$qty units @ ₹$formattedUnitCost WAC", style = MaterialTheme.typography.bodySmall)
                         }
-                        Text("₹${String.format(Locale.US, "%.2f", lineCost)}", fontWeight = FontWeight.Bold)
+                        Text("₹$formattedLineCost", fontWeight = FontWeight.Bold)
                     }
                 }
             }
 
             if (viewModel.bomInputs.isNotEmpty()) {
                 item {
+                    val formattedMatCost = String.format(Locale.US, "%.2f", totalMaterialCost)
+                    val formattedLaborCost = String.format(Locale.US, "%.2f", lCost)
+                    val formattedCostPerUnit = String.format(Locale.US, "%.2f", costPerUnit)
+
                     Card(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text("True Batch Costing", style = MaterialTheme.typography.labelLarge)
                             HorizontalDivider()
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Raw Material Cost:"); Text("₹${String.format(Locale.US, "%.2f", totalMaterialCost)}") }
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Labor / Overhead:"); Text("₹${String.format(Locale.US, "%.2f", lCost)}") }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Raw Material Cost:"); Text("₹$formattedMatCost") }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("Labor / Overhead:"); Text("₹$formattedLaborCost") }
                             HorizontalDivider()
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text("New FG WAC (Per Unit)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
-                                Text("₹${String.format(Locale.US, "%.2f", costPerUnit)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
+                                Text("₹$formattedCostPerUnit", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
                             }
                         }
                     }

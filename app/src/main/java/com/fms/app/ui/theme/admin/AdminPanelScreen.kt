@@ -19,7 +19,7 @@ fun AdminPanelScreen(viewModel: AdminPanelViewModel = viewModel()) {
         Spacer(modifier = Modifier.height(16.dp))
 
         if (viewModel.isLoading) {
-            CircularProgressIndicator()
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(viewModel.tenants) { tenant ->

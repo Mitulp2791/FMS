@@ -60,7 +60,7 @@ fun BillingScreen(viewModel: BillingViewModel = viewModel()) {
             Spacer(modifier = Modifier.height(16.dp))
 
             Text("Cart Items", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            
+
             // Cart List
             LazyColumn(modifier = Modifier.weight(1f)) {
                 itemsIndexed(viewModel.cartItems) { index, item ->
@@ -87,7 +87,7 @@ fun BillingScreen(viewModel: BillingViewModel = viewModel()) {
             }
 
             // Summary Section
-            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween

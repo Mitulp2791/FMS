@@ -18,6 +18,7 @@ import androidx.core.view.WindowCompat
 private val DarkColorScheme = darkColorScheme()
 private val LightColorScheme = lightColorScheme()
 
+@Suppress("DEPRECATION")
 @Composable
 fun FMSTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),

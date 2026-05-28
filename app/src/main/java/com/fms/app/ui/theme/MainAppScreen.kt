@@ -1,5 +1,6 @@
 package com.fms.app.ui.theme
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -32,8 +33,20 @@ data class AppModuleItem(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainAppScreen(onNavigateToModule: (String) -> Unit, onLogout: () -> Unit) {
-    
+fun MainAppScreen(
+    onNavigateToModule: (String) -> Unit, 
+    onLogout: () -> Unit,
+    onExitImpersonation: (() -> Unit)? = null
+) {
+    // Handle back button to exit impersonation or logout instead of exiting app
+    BackHandler {
+        if (UserSession.isImpersonating && onExitImpersonation != null) {
+            onExitImpersonation()
+        } else {
+            onLogout()
+        }
+    }
+
     val allModules = listOf(
         AppModuleItem("Sales & Billing", Icons.Default.ShoppingCart, "Billing"),
         AppModuleItem("Inventory", Icons.AutoMirrored.Filled.List, "Inventory"),
@@ -46,7 +59,8 @@ fun MainAppScreen(onNavigateToModule: (String) -> Unit, onLogout: () -> Unit) {
     )
 
     // Filter modules based on Tenant-specific RBAC permissions
-    val authorizedModules = remember {
+    // Added keys to remember to ensure UI refreshes correctly during session changes
+    val authorizedModules = remember(UserSession.companyId, UserSession.isImpersonating, UserSession.role) {
         allModules.filter { module ->
             UserSession.isMasterAdmin() || UserSession.hasPermission(module.moduleKey, "view")
         }
@@ -67,13 +81,21 @@ fun MainAppScreen(onNavigateToModule: (String) -> Unit, onLogout: () -> Unit) {
                 },
                 actions = {
                     if (UserSession.isImpersonating) {
+                        IconButton(onClick = { onExitImpersonation?.invoke() }) {
+                            Icon(
+                                imageVector = Icons.Default.AdminPanelSettings, 
+                                contentDescription = "Exit Impersonation",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                        
                         Surface(
                             color = MaterialTheme.colorScheme.error,
                             shape = RoundedCornerShape(4.dp),
                             modifier = Modifier.padding(end = 8.dp)
                         ) {
                             Text(
-                                "SANDBOX MODE", 
+                                "SANDBOX",
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color.White

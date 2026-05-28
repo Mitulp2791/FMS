@@ -119,13 +119,35 @@ class AccountMasterViewModel : ViewModel() {
         fax.value = data["fax"]?.toString() ?: ""
         phone.value = data["phone"]?.toString() ?: ""
         mobile.value = data["mobile"]?.toString() ?: ""
+        isWhatsappSame.value = data["isWhatsappSame"] as? Boolean ?: true
         whatsappNo.value = data["whatsappNo"]?.toString() ?: ""
         accountType.value = data["accountType"]?.toString() ?: "Customer"
         group.value = data["group"]?.toString() ?: ""
+        reference.value = data["reference"]?.toString() ?: ""
         
         bankName.value = data["bankName"]?.toString() ?: ""
+        branchName.value = data["branchName"]?.toString() ?: ""
+        branchLocation.value = data["branchLocation"]?.toString() ?: ""
         bankAccountNo.value = data["bankAccountNo"]?.toString() ?: ""
+        ifscCode.value = data["ifscCode"]?.toString() ?: ""
+        micrCode.value = data["micrCode"]?.toString() ?: ""
+        swiftCode.value = data["swiftCode"]?.toString() ?: ""
+        
+        panNo.value = data["panNo"]?.toString() ?: ""
+        aadhaarNo.value = data["aadhaarNo"]?.toString() ?: ""
+        passportNo.value = data["passportNo"]?.toString() ?: ""
         gstin.value = data["gstin"]?.toString() ?: ""
+        voterId.value = data["voterId"]?.toString() ?: ""
+        drivingLicense.value = data["drivingLicense"]?.toString() ?: ""
+        dob.value = data["dob"]?.toString() ?: ""
+        annDate.value = data["annDate"]?.toString() ?: ""
+        dueDays.value = data["dueDays"]?.toString() ?: "30"
+        
+        isMsmeRegistered.value = data["isMsmeRegistered"] as? Boolean ?: false
+        msmeCategory.value = data["msmeCategory"]?.toString() ?: "Micro"
+        isKyc.value = data["isKyc"] as? Boolean ?: false
+        tdsTcsApplicable.value = data["tdsTcsApplicable"]?.toString() ?: "None"
+        assesseType.value = data["assesseType"]?.toString() ?: "Individual"
         
         isEntryStarted.value = true
     }
@@ -133,17 +155,50 @@ class AccountMasterViewModel : ViewModel() {
     fun saveAccount(onSuccess: (String, String) -> Unit) {
         if (name.value.isBlank()) return
 
-        val data = mapOf(
+        val data = mutableMapOf<String, Any>(
             "name" to name.value,
             "alias" to alias.value,
             "contactPerson" to contactPerson.value,
             "address" to address.value,
+            "area" to area.value,
+            "district" to district.value,
             "city" to city.value,
+            "pincode" to pincode.value,
+            "state" to state.value,
+            "email" to email.value,
+            "fax" to fax.value,
+            "phone" to phone.value,
             "mobile" to mobile.value,
+            "isWhatsappSame" to isWhatsappSame.value,
             "whatsappNo" to whatsappNo.value,
             "accountType" to accountType.value,
-            "gstin" to gstin.value,
+            "group" to group.value,
+            "reference" to reference.value,
+            
+            "bankName" to bankName.value,
+            "branchName" to branchName.value,
+            "branchLocation" to branchLocation.value,
             "bankAccountNo" to bankAccountNo.value,
+            "ifscCode" to ifscCode.value,
+            "micrCode" to micrCode.value,
+            "swiftCode" to swiftCode.value,
+            
+            "panNo" to panNo.value,
+            "aadhaarNo" to aadhaarNo.value,
+            "passportNo" to passportNo.value,
+            "gstin" to gstin.value,
+            "voterId" to voterId.value,
+            "drivingLicense" to drivingLicense.value,
+            "dob" to dob.value,
+            "annDate" to annDate.value,
+            "dueDays" to dueDays.value,
+            
+            "isMsmeRegistered" to isMsmeRegistered.value,
+            "msmeCategory" to msmeCategory.value,
+            "isKyc" to isKyc.value,
+            "tdsTcsApplicable" to tdsTcsApplicable.value,
+            "assesseType" to assesseType.value,
+            
             "tenantId" to (UserSession.companyId ?: "")
         )
 
@@ -169,8 +224,45 @@ class AccountMasterViewModel : ViewModel() {
         alias.value = ""
         contactPerson.value = ""
         address.value = ""
+        area.value = "Default"
+        district.value = "Default"
+        city.value = "MUMBAI"
+        pincode.value = ""
+        state.value = "MAHARASHTRA"
+        email.value = ""
+        fax.value = ""
+        phone.value = ""
         mobile.value = ""
+        isWhatsappSame.value = true
         whatsappNo.value = ""
+        accountType.value = "Customer"
+        group.value = "Sundry Debtors"
+        reference.value = ""
+        
+        bankName.value = ""
+        branchName.value = ""
+        branchLocation.value = ""
+        bankAccountNo.value = ""
+        ifscCode.value = ""
+        micrCode.value = ""
+        swiftCode.value = ""
+        
+        panNo.value = ""
+        aadhaarNo.value = ""
+        passportNo.value = ""
+        gstin.value = ""
+        voterId.value = ""
+        drivingLicense.value = ""
+        dob.value = ""
+        annDate.value = ""
+        dueDays.value = "30"
+        
+        isMsmeRegistered.value = false
+        msmeCategory.value = "Micro"
+        isKyc.value = false
+        tdsTcsApplicable.value = "None"
+        assesseType.value = "Individual"
+        
         isEntryStarted.value = false
     }
 }

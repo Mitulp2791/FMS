@@ -7,11 +7,10 @@ import androidx.lifecycle.ViewModel
 import com.fms.app.data.FirebaseBootstrap
 import com.fms.app.data.UserSession
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.FirebaseDatabase
 
 /**
- * LoginViewModel: Orchestrates the secure multi-tenant authentication flow.
- * Ensures that users are bound to their respective tenants and Master Admins have global reach.
+ * LoginViewModel: Directs security context routing during user initialization.
+ * Verifies structural boundaries and lets platform managers bypass tenant scope barriers.
  */
 class LoginViewModel : ViewModel() {
     var errorMessage by mutableStateOf<String?>(null)
@@ -25,12 +24,11 @@ class LoginViewModel : ViewModel() {
     }
 
     /**
-     * Executes a secure login.
-     * For SaaS: Validates Company ID, User Role, and Subscription Status.
+     * Validates corporate user claims against real-time security nodes.
      */
     fun performCompanySecureLogin(companyCode: String, email: String, pass: String, onSuccess: (String) -> Unit) {
         if (companyCode.isBlank() || email.isBlank() || pass.isBlank()) {
-            errorMessage = "Please fill all fields (Company Code, Email, and Password)"
+            errorMessage = "All fields (Company Code, Email, and Password) are mandatory."
             return
         }
 
@@ -39,41 +37,30 @@ class LoginViewModel : ViewModel() {
 
         FirebaseAuth.getInstance().signInWithEmailAndPassword(email, pass)
             .addOnSuccessListener { authResult ->
-                val uid = authResult.user?.uid ?: return@addOnSuccessListener
+                val uid = authResult.user?.uid ?: ""
 
-                // Initialize session and verify tenant
-                FirebaseBootstrap.initialize(uid) { success ->
+                // Contextual single-parameter callback sequence loop matching FirebaseBootstrap signature exactly
+                FirebaseBootstrap.initialize(uid, companyCode) { success ->
                     if (success) {
-                        // POST-INIT LOGIC:
-                        // 1. If Master Admin, they can bypass the company check or impersonate the target code.
-                        if (UserSession.role == "MasterAdmin") {
-                            if (companyCode.isNotEmpty() && companyCode != "SYSTEM") {
-                                // Master Admin is logging into a specific company context directly
-                                UserSession.startImpersonation(companyCode)
-                            }
-                            isLoading = false
-                            onSuccess(UserSession.role ?: "MasterAdmin")
-                        } 
-                        // 2. Regular User/Admin: Must match the companyCode they are logging into
-                        else if (UserSession.companyId == companyCode) {
+                        val resolvedRole = UserSession.role
+                        if (resolvedRole == "MasterAdmin" || UserSession.companyId == companyCode) {
                             if (UserSession.isAccountActive) {
                                 isLoading = false
-                                onSuccess(UserSession.role ?: "User")
+                                onSuccess(resolvedRole ?: "User")
                             } else {
-                                errorMessage = "This company account has been suspended. Please contact the Super Admin."
+                                errorMessage = "Access Blocked: Workspace account is currently suspended."
                                 FirebaseAuth.getInstance().signOut()
                                 UserSession.clear()
                                 isLoading = false
                             }
-                        } 
-                        else {
-                            errorMessage = "Access Denied: You do not belong to Company ID: $companyCode"
+                        } else {
+                            errorMessage = "Access Denied: Security assignment error for Company: $companyCode"
                             FirebaseAuth.getInstance().signOut()
                             UserSession.clear()
                             isLoading = false
                         }
                     } else {
-                        errorMessage = "Login Failed: Invalid credentials or inactive account."
+                        errorMessage = "Login Failed: Check credentials, active status, or company code."
                         FirebaseAuth.getInstance().signOut()
                         UserSession.clear()
                         isLoading = false
@@ -81,7 +68,7 @@ class LoginViewModel : ViewModel() {
                 }
             }
             .addOnFailureListener { e ->
-                errorMessage = e.localizedMessage ?: "Authentication Failed"
+                errorMessage = e.localizedMessage ?: "Authentication Handshake Aborted."
                 isLoading = false
             }
     }

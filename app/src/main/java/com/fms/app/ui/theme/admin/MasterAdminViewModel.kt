@@ -16,10 +16,6 @@ data class TenantCompany(
     val isActive: Boolean = true
 )
 
-/**
- * MasterAdminViewModel: The top-tier controller for the SaaS owner.
- * Manages company onboarding, subscription states, and tenant impersonation.
- */
 class MasterAdminViewModel : ViewModel() {
     val companies = mutableStateListOf<TenantCompany>()
     var isLoading by mutableStateOf(false)
@@ -29,39 +25,35 @@ class MasterAdminViewModel : ViewModel() {
         fetchAllCompanies()
     }
 
-    /**
-     * Fetches all registered companies from the global /Companies/ node.
-     */
     fun fetchAllCompanies() {
         isLoading = true
-        FirebaseDatabase.getInstance().getReference("Companies")
+        FirebaseDatabase.getInstance().getReference("SYSTEM").child("companyRegistry")
             .get().addOnSuccessListener { snapshot ->
                 val list = mutableListOf<TenantCompany>()
                 snapshot.children.forEach { snap ->
-                    val company = snap.getValue(TenantCompany::class.java)
-                    if (company != null) {
-                        list.add(company.copy(id = snap.key ?: ""))
-                    }
+                    val idKey = snap.key ?: ""
+                    val name = snap.child("name").value?.toString() ?: ""
+                    val tier = snap.child("tier").value?.toString() ?: "Free"
+                    val maxUsers = snap.child("maxUsers").getValue(Int::class.java) ?: 5
+                    val isActive = snap.child("isActive").value as? Boolean ?: true
+
+                    list.add(TenantCompany(idKey, name, tier, maxUsers, isActive))
                 }
                 companies.clear()
                 companies.addAll(list)
                 isLoading = false
             }.addOnFailureListener {
-                errorMessage = "Failed to load companies: ${it.message}"
+                errorMessage = "Directory download broken: ${it.message}"
                 isLoading = false
             }
     }
 
-    /**
-     * Onboard a new business into the SaaS platform.
-     * Creates entries in both the /Companies global index and the /Businesses tenant container.
-     */
     fun createCompany(id: String, name: String, tier: String, maxUsers: Int) {
         if (id.isBlank() || name.isBlank()) {
-            errorMessage = "Company ID and Name are required"
+            errorMessage = "Please fill out all parameter definitions."
             return
         }
-        
+
         val companyData = mapOf(
             "name" to name,
             "tier" to tier,
@@ -70,37 +62,53 @@ class MasterAdminViewModel : ViewModel() {
             "createdAt" to System.currentTimeMillis()
         )
 
-        FirebaseDatabase.getInstance().getReference("Companies").child(id)
+        FirebaseDatabase.getInstance().getReference("SYSTEM").child("companyRegistry").child(id)
             .setValue(companyData)
             .addOnSuccessListener {
-                // Initialize the tenant-specific configuration with default Admin permissions
-                val defaultConfig = mapOf(
-                    "config/roles/Admin/Dashboard/view" to true,
-                    "config/roles/Admin/Inventory/view" to true,
-                    "config/roles/Admin/Billing/create" to true
+                val baseStructure = mapOf(
+                    "System/Settings/companyName" to name,
+                    "System/Settings/isActive" to true
                 )
-                FirebaseDatabase.getInstance().getReference("Businesses/$id").updateChildren(defaultConfig)
+                FirebaseDatabase.getInstance().getReference("companies/$id").updateChildren(baseStructure)
                 fetchAllCompanies()
             }
             .addOnFailureListener {
-                errorMessage = "Failed to create company: ${it.message}"
+                errorMessage = "Failed to board client company: ${it.message}"
             }
     }
 
-    /**
-     * Suspends or activates a tenant account.
-     */
+    fun updateCompanyDetails(id: String, name: String, tier: String, maxUsers: Int) {
+        if (id.isBlank() || name.isBlank()) {
+            errorMessage = "Company Name cannot be blank."
+            return
+        }
+
+        val updates = mapOf(
+            "name" to name,
+            "tier" to tier,
+            "maxUsers" to maxUsers
+        )
+
+        FirebaseDatabase.getInstance().getReference("SYSTEM").child("companyRegistry").child(id)
+            .updateChildren(updates)
+            .addOnSuccessListener {
+                FirebaseDatabase.getInstance().getReference("companies/$id/System/Settings/companyName")
+                    .setValue(name)
+                fetchAllCompanies()
+            }
+            .addOnFailureListener {
+                errorMessage = "Failed to update company parameters: ${it.message}"
+            }
+    }
+
     fun toggleCompanyStatus(companyId: String, currentStatus: Boolean) {
-        FirebaseDatabase.getInstance().getReference("Companies").child(companyId)
+        FirebaseDatabase.getInstance().getReference("SYSTEM").child("companyRegistry").child(companyId)
             .child("isActive").setValue(!currentStatus)
-            .addOnSuccessListener { 
-                fetchAllCompanies() 
+            .addOnSuccessListener {
+                fetchAllCompanies()
             }
     }
 
-    /**
-     * Allows the Master Admin to jump into a specific tenant's context.
-     */
     fun loginAsTenant(companyId: String, onComplete: () -> Unit) {
         UserSession.startImpersonation(companyId)
         onComplete()

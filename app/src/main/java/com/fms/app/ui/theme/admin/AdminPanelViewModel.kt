@@ -21,15 +21,16 @@ class AdminPanelViewModel : ViewModel() {
 
     private fun loadTenants() {
         isLoading = true
-        val dbRef = FirebaseDatabase.getInstance().getReference("Businesses")
+        // Updated to read from the new SYSTEM tier registry
+        val dbRef = FirebaseDatabase.getInstance().getReference("SYSTEM/companyRegistry")
         dbRef.addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val tenantList = mutableListOf<Map<String, Any>>()
                 for (child in snapshot.children) {
                     val data = mutableMapOf<String, Any>()
                     data["companyId"] = child.key ?: ""
-                    data["isActive"] = child.child("System/Settings/isActive").value ?: true
-                    data["name"] = child.child("System/Settings/companyName").value?.toString() ?: "Unnamed Tenant"
+                    data["isActive"] = child.child("isActive").value ?: true
+                    data["name"] = child.child("name").value?.toString() ?: "Unnamed Tenant"
                     tenantList.add(data)
                 }
                 tenants.clear()
@@ -44,7 +45,7 @@ class AdminPanelViewModel : ViewModel() {
     }
 
     fun toggleTenantStatus(companyId: String, currentStatus: Boolean) {
-        val dbRef = FirebaseDatabase.getInstance().getReference("Businesses/$companyId/System/Settings/isActive")
+        val dbRef = FirebaseDatabase.getInstance().getReference("SYSTEM/companyRegistry/$companyId/isActive")
         dbRef.setValue(!currentStatus).addOnSuccessListener {
             loadTenants()
         }
